@@ -1,8 +1,10 @@
 #include <Arduino.h>
+#include <SoftwareSerial.h>
 
 #define RS485_TX 	 16 //HARDWARE SERIAL 2
 #define RS485_RX     17 //HARDWARE SERIAL 2
 #define RS485_EN     4
+#define V_EN		 33
 #define RS485_BR 	 4800 //9600//4800// moisture
 
 
@@ -10,9 +12,26 @@ byte soilSensorResponse[9];
 
 byte co2SensorResponse[12];
 
+byte baudRateRequestCO2[] = {
+  0x2D,    // Dirección del dispositivo (0x2D es la representación decimal de 45)
+  0x06,    // Número de función (escritura de datos)
+  0x00, 0x11, // Dirección del registro a escribir (0x0011 para cambio de baudrate)
+  0x00, 0x02, // Índice del baudrate a establecer (Revisar datasheet para distintos valores)
+  0x00, 0x00 // CRC (a rellenar)
+};
+
+byte directionRequestCO2[] = {
+  0x2D,    // Dirección del dispositivo (0x2D es la representación decimal de 45)
+  0x06,    // Número de función (escritura de datos)
+  0x00, 0x10, // Dirección del registro a escribir (0x0010 para cambio de direccion)
+  0x00, 0x02, // Direccion a establecer en hex
+  0x00, 0x00 // CRC (a rellenar)
+};
+
 #define SERIAL_RS485 Serial2
+SoftwareSerial swSer;
 
-
+//Las funciones readMOISTURE y readCO2 fueron hechas antes de sendInstruction y readCommunitation y se pueden actualizar
 void readMOISTURE()
 {
 	byte soilSensorRequest[] = {0x01,0x03,0x00,0x00,0x00,0x01,0x84,0x0A};
@@ -137,7 +156,7 @@ uint16_t calculateCRC(byte data[], uint8_t length) {
   }
   return crc;
 }
-
+/* Actualmente changeBaudRate y changedirection pueden ser reemplazadas por sendInstruction, entregando la trama correcta como entrada unicamente
 void changeBaudRate() {
   // Prepara la trama de solicitud para cambiar el baudrate
   byte baudRateRequest[] = {
@@ -161,7 +180,7 @@ void changeBaudRate() {
   SERIAL_RS485.flush(); // Espera a que se complete la transmisión
   digitalWrite(RS485_EN, LOW); // Deshabilita la transmisión
   
-  delay(1000); // Espera 1 segundo para permitir que el cambio de baudrate surta efecto
+  delay(100); // Espera 1 segundo para permitir que el cambio de baudrate surta efecto
 }
 
 void changedirection() {
@@ -187,7 +206,38 @@ void changedirection() {
   SERIAL_RS485.flush(); // Espera a que se complete la transmisión
   digitalWrite(RS485_EN, LOW); // Deshabilita la transmisión
   
-  delay(1000); // Espera 1 segundo para permitir que el cambio de baudrate surta efecto
+  delay(100); // Espera 1 segundo para permitir que el cambio de baudrate surta efecto
+}
+*/
+template <size_t N>
+
+void sendInstruction(int enable, Stream &RST, byte (&trama)[N]){
+  digitalWrite(enable, HIGH); // Habilita la transmisión
+  RST.write(trama, N); // Envía la solicitud
+  RST.flush(); // Espera a que se complete la transmisión
+  digitalWrite(enable, LOW); // Deshabilita la transmisión
+  
+  delay(100); // Espera 1 segundo para permitir que el cambio de baudrate surta efecto
+}
+
+byte* readCommunication(Stream &RST, int bits_lectura) { //ADVERTENCIA si el datasheet dice que los bits de respuesta son 12 int bits_lectura debe ser 11, es decir bits-1
+    byte* response = new byte[bits_lectura];
+    unsigned long startTime = millis();
+    while (RST.available() < bits_lectura && millis() - startTime < 1000) {
+        delay(1);
+    }
+    if (RST.available() >= bits_lectura) {
+        byte index = 0;
+        while (RST.available() && index < bits_lectura)
+        {
+          response[index] = RST.read();
+          Serial.print(response[index], HEX); // Print the received byte in HEX format
+          Serial.print(" ");
+          index++;
+        }
+        Serial.println();
+        }
+    return response;
 }
 
 void setup() {
@@ -195,16 +245,55 @@ void setup() {
 	Serial.begin(115200); //para el monitor serial
 	pinMode(RS485_EN,OUTPUT); //enable de la comunicación
 
+  pinMode(V_EN,OUTPUT);
+  digitalWrite(V_EN  ,HIGH);
 	digitalWrite(RS485_EN,LOW);	//define el pin de enable
 	SERIAL_RS485.begin(RS485_BR); //establece el baudrate de la comunicación
+  swSer.begin(RS485_BR, SWSERIAL_8N1, 33, 32);
 }
 
 void loop() {
-	Serial.println("Medir Moisture");
-	readMOISTURE();
-	delay(10000);
-	Serial.println("Medir CO2, Temp, Humedad");
-	readCO2();
-	delay(10000);
+  Serial.println("Medir Moisture");
+  byte soilSensorRequest[] = {0x01,0x03,0x00,0x00,0x00,0x01,0x84,0x0A};
+  Serial.println("envia solicitud");
+  sendInstruction(RS485_EN, swSer, soilSensorRequest);
+  Serial.println("Enviada...Leer");
+  byte* response = readCommunication(swSer, 7); // Obtener la respuesta
+
+  delay(5000);
+  byte sensorRequest[] = {
+        0x2D, // Dirección del dispositivo (0x2D es la representación hexadecimal de 45)
+        0x03, // Número de función (Lectura de datos)
+        0x00, 0x00, // Dirección de inicio del registro a leer (por ejemplo, 0x0000)
+        0x00, 0x03, // Cantidad de registros a leer (2 bytes)
+        0x02, 0x67 // CRC
+    };
+  Serial.println("envia solicitud");
+  sendInstruction(RS485_EN, swSer, sensorRequest);
+  Serial.println("Enviada...Leer");
+  response = readCommunication(swSer, 11); // Obtener la respuesta
+    if (response != nullptr) { // Verifica si se recibió una respuesta
+        Serial.println("Respuesta recibida:");
+        int CO2 = (response[3] << 8) | response[4];
+        int Temp = (response[5] << 8) | response[6];
+        int Humedad = (response[7] << 8) | response[8];
+
+        Serial.println("");
+
+        Serial.print("CO2: ");
+        Serial.print(CO2);
+        Serial.println(" ppm");
+
+        Serial.print("Humedad: ");
+        Serial.print(Humedad/100);
+        Serial.println(" %");
+
+        Serial.print("Temperatura: ");
+        Serial.print(Temp/100);
+        Serial.println(" C");
+        Serial.println(); // Imprime una nueva línea al final
+        delete[] response;
+    }
+    delay(5000);
 }
 
