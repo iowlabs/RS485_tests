@@ -1,2 +1,18 @@
 # RS485_tests
 Funciones de prueba de sensores RS485 e introducción a la comunicación
+
+Inicialmente se generaron 2 funciones,  readCO2() y readMOISTURE(), estas funciones utilizan una trama basica para pedir una lectura de los datos al sensor, estas tramas deben ser un byte y se llama tal que byte soilSensorRequest[] = {0x01,0x03,0x00,0x00,0x00,0x01,0x84,0x0A}; en este caso se expone la trama del sensor de moisture, el primer bit es la dirección, el segundo bit es el comando que determina la lectura o la escritura, tipicamente es 0x03 para lectura, y 0x06 para escritura, los siguientes bits seran dependientes del sensor, pueden indicar la cantidad de datos a leer, o la direccion del datos, esto debe ser revisado en la documentacion del sensor, generalmente los ultimos bits corresponden a CRC que funciona como verificador de los datos
+
+La recepcion de información depende de la cantidad de datos solicitados y el sensor utilizado, se requiere verificar la información de su hoja de datos, tipicamente la respuesta tiene como primer bit la direccion a la cual se le pedio la información, como segundo bit la instruccion que se dio si fue de escritura o lectura, y como tercer bit suele ser la cantidad de bit de información entregados, luego los bits de información del sensor y los ultimos bits suelen ser CRC, que debiese ser igual al enviado en la instrucción
+
+Al poner a prueba el sensor de CO2, Temperatura y Humedad vendido por seedstudio "SenseCAP CO2, Temperature and Humidity Sensor with RS485&SDI-12 , with Waterproof Aviation Connector" se comprobo que el crc no se recibia correctamente en todo momento, pero los datos medidos y el retorno si fue correcto por lo que se sugiere revisar los datos inicales en lugar del crc, es decir que la direccion, intruccion y numero de bits sean correctos
+
+Luego de implementar estas funciones iniciales de lectura se implemento una funcion de cambio de dirección y de cambio de baudrate, se cambio el baudrate de el sensor de CO2 para poder utilizarse en la misma linea que el sensor de MOISTURE, se corroboro que ambos sensores funcionaron correctamente al mismo baudrate en la misma linea de uart
+
+# Funciones finales
+
+Luego de estas implementaciones iniciales se decidio realizar unas funciones mas flexibles que permitan agilizar la programación de de distintos sensores, para esto se creo una funcion endInstruction(int enable, Stream &RST, byte (&trama)[N]), a esta funcion se le entrega el pin de enable, el serial, y la trama, la funcion es capaz de procesar tramas de distintos largos, y utlizar seriales de hardware y software correctamente, se hizo la prueba con el serial2 base de la esp32, un software serial en diferentes pines (27,26) y (33,32) funcionando correctamente, y finalmente el hardware serial 1 cambiando sus pines al (33,32) corroborando el funcionamiento de la funcion en todos los casos
+
+Se definio como lectura la funcion byte* readCommunication(Stream &RST, int bits_lectura), en esta funcion se le debe entregar un serial igual que en el caso anterior, que puede ser software serial o hardware serial, el entero bits_lectura corresponde a la cantidad de bits que tendra la respuesta, esto dependera de la instrucción y el sensor, se debe dar N-1 a la cantidad de bits de la documentación debido al conteo desde 0, si la documentación dice que la respuesta es de 12 bits bits_lectura sera 11, si la documentación dice 8 bits bits_lectura sera 7
+
+Con esto se implementa el uso de sensores RS485 con una ESP32, se debe tener como interracion media un MAX3485 para manejar el RS485 por uart
