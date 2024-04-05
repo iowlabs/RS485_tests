@@ -3,9 +3,9 @@
 
 #define RS485_TX 	 16 //HARDWARE SERIAL 2
 #define RS485_RX     17 //HARDWARE SERIAL 2
-#define RS485_EN     4
+#define RS485_EN     32
 #define V_EN		 33
-#define RS485_BR 	 4800 //9600//4800// moisture
+#define RS485_BR 	 9600//4800//
 
 
 byte soilSensorResponse[9];
@@ -13,19 +13,19 @@ byte soilSensorResponse[9];
 byte co2SensorResponse[12];
 
 byte baudRateRequestCO2[] = {
-  0x2D,    // Dirección del dispositivo (0x2D es la representación decimal de 45)
-  0x06,    // Número de función (escritura de datos)
-  0x00, 0x11, // Dirección del registro a escribir (0x0011 para cambio de baudrate)
-  0x00, 0x02, // Índice del baudrate a establecer (Revisar datasheet para distintos valores)
-  0x00, 0x00 // CRC (a rellenar)
+	0x2D,    // Dirección del dispositivo (0x2D es la representación decimal de 45)
+	0x06,    // Número de función (escritura de datos)
+	0x00, 0x11, // Dirección del registro a escribir (0x0011 para cambio de baudrate)
+	0x00, 0x02, // Índice del baudrate a establecer (Revisar datasheet para distintos valores)
+	0x00, 0x00 // CRC (a rellenar)
 };
 
 byte directionRequestCO2[] = {
-  0x2D,    // Dirección del dispositivo (0x2D es la representación decimal de 45)
-  0x06,    // Número de función (escritura de datos)
-  0x00, 0x10, // Dirección del registro a escribir (0x0010 para cambio de direccion)
-  0x00, 0x02, // Direccion a establecer en hex
-  0x00, 0x00 // CRC (a rellenar)
+	0x2D,    // Dirección del dispositivo (0x2D es la representación decimal de 45)
+	0x06,    // Número de función (escritura de datos)
+	0x00, 0x10, // Dirección del registro a escribir (0x0010 para cambio de direccion)
+	0x00, 0x02, // Direccion a establecer en hex
+	0x00, 0x00 // CRC (a rellenar)
 };
 
 #define SERIAL_RS485 Serial2
@@ -231,10 +231,10 @@ byte* readCommunication(Stream &RST, int bits_lectura) { //ADVERTENCIA si el dat
         byte index = 0;
         while (RST.available() && index < bits_lectura)
         {
-          response[index] = RST.read();
-          Serial.print(response[index], HEX); // Print the received byte in HEX format
-          Serial.print(" ");
-          index++;
+			response[index] = RST.read();
+			Serial.print(response[index], HEX); // Print the received byte in HEX format
+			Serial.print(" ");
+			index++;
         }
         Serial.println();
         }
@@ -245,58 +245,63 @@ void setup() {
 
 	Serial.begin(115200); //para el monitor serial
 	pinMode(RS485_EN,OUTPUT); //enable de la comunicación
-
-  pinMode(V_EN,OUTPUT);
-  digitalWrite(V_EN  ,HIGH);
+	pinMode(V_EN,OUTPUT);
+	digitalWrite(V_EN  ,HIGH);
 	digitalWrite(RS485_EN,LOW);	//define el pin de enable
-  //Se realizaron las pruebas con Serial1, Serial2, y un SoftwareSerial, todas las convenciones funcionan correctamente
+	//Se realizaron las pruebas con Serial1, Serial2, y un SoftwareSerial, todas las convenciones funcionan correctamente
 	SERIAL_RS485.begin(RS485_BR); //establece el baudrate de la comunicación
-  //swSer.begin(RS485_BR, SWSERIAL_8N1, 27, 26);
-  Serial1.begin(RS485_BR, SERIAL_8N1, 27, 26);
+	//swSer.begin(RS485_BR, SWSERIAL_8N1, 27, 26);
+	//Serial1.begin(RS485_BR, SERIAL_8N1, 27, 26);
 }
 
 void loop() {
-  Serial.println("Medir Moisture");
-  byte soilSensorRequest[] = {0x01,0x03,0x00,0x00,0x00,0x01,0x84,0x0A};
-  Serial.println("envia solicitud");
-  sendInstruction(RS485_EN, Serial1, soilSensorRequest);
-  Serial.println("Enviada...Leer");
-  byte* response = readCommunication(Serial1, 7); // Obtener la respuesta
+	/*
+	Serial.println("Medir Moisture");
+	byte soilSensorRequest[] = {0x01,0x03,0x00,0x00,0x00,0x01,0x84,0x0A};
+	Serial.println("envia solicitud");
+	sendInstruction(RS485_EN, Serial1, soilSensorRequest);
+	Serial.println("Enviada...Leer");
+	byte* response = readCommunication(Serial1, 7); // Obtener la respuesta
 
-  delay(5000);
-  byte sensorRequest[] = {
-        0x2D, // Dirección del dispositivo (0x2D es la representación hexadecimal de 45)
-        0x03, // Número de función (Lectura de datos)
-        0x00, 0x00, // Dirección de inicio del registro a leer (por ejemplo, 0x0000)
-        0x00, 0x03, // Cantidad de registros a leer (2 bytes)
-        0x02, 0x67 // CRC
-    };
-  Serial.println("envia solicitud");
-  sendInstruction(RS485_EN, Serial1, sensorRequest);
-  Serial.println("Enviada...Leer");
-  response = readCommunication(Serial1, 11); // Obtener la respuesta
-    if (response != nullptr) { // Verifica si se recibió una respuesta
-        Serial.println("Respuesta recibida:");
-        int CO2 = (response[3] << 8) | response[4];
-        int Temp = (response[5] << 8) | response[6];
-        int Humedad = (response[7] << 8) | response[8];
+	delay(5000);
+	*/
+	byte sensorRequest[] = {
+		0x2D, // Dirección del dispositivo (0x2D es la representación hexadecimal de 45)
+		0x03, // Número de función (Lectura de datos)
+		0x00, 0x00, // Dirección de inicio del registro a leer (por ejemplo, 0x0000)
+		0x00, 0x03, // Cantidad de registros a leer (2 bytes)
+		0x02, 0x67 // CRC
+	};
+	
+	Serial.println("envia solicitud");
+	sendInstruction(RS485_EN, SERIAL_RS485, sensorRequest);
+	Serial.println("Enviada...Leer");
+	byte* response = readCommunication(SERIAL_RS485, 11); // Obtener la respuesta
+	for (int i = 0; i < 11; i++) {
+		Serial.write(response[i]); // Escribir cada byte del array
+	}
+	if (response != nullptr) { // Verifica si se recibió una respuesta
+		Serial.println("Respuesta recibida:");
+		int CO2 = (response[3] << 8) | response[4];
+		int Temp = (response[5] << 8) | response[6];
+		int Humedad = (response[7] << 8) | response[8];
 
-        Serial.println("");
+		Serial.println("");
 
-        Serial.print("CO2: ");
-        Serial.print(CO2);
-        Serial.println(" ppm");
+		Serial.print("CO2: ");
+		Serial.print(CO2);
+		Serial.println(" ppm");
 
-        Serial.print("Humedad: ");
-        Serial.print(Humedad/100);
-        Serial.println(" %");
+		Serial.print("Humedad: ");
+		Serial.print(Humedad/100);
+		Serial.println(" %");
 
-        Serial.print("Temperatura: ");
-        Serial.print(Temp/100);
-        Serial.println(" C");
-        Serial.println(); // Imprime una nueva línea al final
-        delete[] response;
-    }
-    delay(5000);
+		Serial.print("Temperatura: ");
+		Serial.print(Temp/100);
+		Serial.println(" C");
+		Serial.println(); // Imprime una nueva línea al final
+		delete[] response;
+	}
+	delay(5000);
 }
 
