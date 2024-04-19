@@ -3,9 +3,10 @@
 
 #define RS485_TX 	 16 //HARDWARE SERIAL 2
 #define RS485_RX     17 //HARDWARE SERIAL 2
-#define RS485_EN     32
+#define RS485_EN     5
+#define RS485_EN_2   32
 #define V_EN		 33
-#define RS485_BR 	 9600//4800//
+#define RS485_BR 	 4800//9600//
 
 
 byte soilSensorResponse[9];
@@ -94,11 +95,12 @@ void readCO2()
     SERIAL_RS485.flush();
     digitalWrite(RS485_EN,LOW);
     delay(100);
+	Serial.println("Funcionando");
 
 	unsigned long startTime = millis();
 	while (SERIAL_RS485.available() < 11 && millis() - startTime < 1000)
 	{
-		delay(1);
+		delay(10);
 	}
 	if (SERIAL_RS485.available() >= 11) // If valid response received
 	{
@@ -112,6 +114,9 @@ void readCO2()
 			index++;
 		}
 		Serial.println();
+		for (int i = 0; i < 11; i++) {
+			Serial.write(co2SensorResponse[i]); // Escribir cada byte del array
+		}
 
 		if (co2SensorResponse[0] == 0x2D && co2SensorResponse[1] == 0x03 && co2SensorResponse[2] == 0x06) {
             // Parsea los valores de CO2, Temperatura y Humedad
@@ -245,38 +250,50 @@ void setup() {
 
 	Serial.begin(115200); //para el monitor serial
 	pinMode(RS485_EN,OUTPUT); //enable de la comunicación
+	pinMode(RS485_EN_2,OUTPUT); //enable de la comunicación
 	pinMode(V_EN,OUTPUT);
 	digitalWrite(V_EN  ,HIGH);
 	digitalWrite(RS485_EN,LOW);	//define el pin de enable
+	digitalWrite(RS485_EN_2,LOW);	//define el pin de enable
 	//Se realizaron las pruebas con Serial1, Serial2, y un SoftwareSerial, todas las convenciones funcionan correctamente
-	SERIAL_RS485.begin(RS485_BR); //establece el baudrate de la comunicación
-	//swSer.begin(RS485_BR, SWSERIAL_8N1, 27, 26);
+	SERIAL_RS485.begin(9600); //establece el baudrate de la comunicación
+	swSer.begin(RS485_BR, SWSERIAL_8N1, 27, 26);
 	//Serial1.begin(RS485_BR, SERIAL_8N1, 27, 26);
 }
 
 void loop() {
-	/*
 	Serial.println("Medir Moisture");
 	byte soilSensorRequest[] = {0x01,0x03,0x00,0x00,0x00,0x01,0x84,0x0A};
 	Serial.println("envia solicitud");
-	sendInstruction(RS485_EN, Serial1, soilSensorRequest);
+	sendInstruction(RS485_EN_2, swSer, soilSensorRequest);
 	Serial.println("Enviada...Leer");
-	byte* response = readCommunication(Serial1, 7); // Obtener la respuesta
+	byte* response = readCommunication(swSer, 7); // Obtener la respuesta
+	if (response != nullptr) { // Verifica si se recibió una respuesta
+		Serial.println("Respuesta recibida:");
+		int Moisture_Int = int(response[3] << 8 | response[4]);
+		float Moisture_Percent = Moisture_Int / 10.0;
+
+		Serial.print("Moisture: ");
+		Serial.print(Moisture_Percent);
+		Serial.println(" %RH\n");
+		Serial.println(); // Imprime una nueva línea al final
+		delete[] response;
+	}
 
 	delay(5000);
-	*/
+
 	byte sensorRequest[] = {
-		0x2D, // Dirección del dispositivo (0x2D es la representación hexadecimal de 45)
-		0x03, // Número de función (Lectura de datos)
-		0x00, 0x00, // Dirección de inicio del registro a leer (por ejemplo, 0x0000)
-		0x00, 0x03, // Cantidad de registros a leer (2 bytes)
-		0x02, 0x67 // CRC
-	};
+        0x2D, // Dirección del dispositivo (0x2D es la representación hexadecimal de 45)
+        0x03, // Número de función (Lectura de datos)
+        0x00, 0x00, // Dirección de inicio del registro a leer (por ejemplo, 0x0000)
+        0x00, 0x03, // Cantidad de registros a leer (2 bytes)
+        0x02, 0x67 // CRC (a rellenar)
+    };
 	
 	Serial.println("envia solicitud");
 	sendInstruction(RS485_EN, SERIAL_RS485, sensorRequest);
 	Serial.println("Enviada...Leer");
-	byte* response = readCommunication(SERIAL_RS485, 11); // Obtener la respuesta
+	response = readCommunication(SERIAL_RS485, 11); // Obtener la respuesta
 	for (int i = 0; i < 11; i++) {
 		Serial.write(response[i]); // Escribir cada byte del array
 	}
@@ -302,6 +319,8 @@ void loop() {
 		Serial.println(); // Imprime una nueva línea al final
 		delete[] response;
 	}
+	
+	//readCO2();
 	delay(5000);
 }
 
